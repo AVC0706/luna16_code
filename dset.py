@@ -13,13 +13,15 @@ CandidateInfoTuple = namedtuple(
     'isNodule_bool, diameter_mm, series_uid, center_xyz',
 )
 
+
 @functools.lru_cache(1)
 def getCandidateInfoList(requireOnDisk_bool=True):
     # We construct a set with all series_uids that are present on disk.
     # This will let us use the data, even if we haven't downloaded all of
     # the subsets yet
     mhd_list = glob.glob('/kaggle/input/luna16/subset0/subset0/*.mhd')
-    presentOnDisk_set = {os.path.split(p)[-1][:-4] for p in mhd_list}   #Takes path as input and returns the series_uuid from path
+    # Takes path as input and returns the series_uuid from path
+    presentOnDisk_set = {os.path.split(p)[-1][:-4] for p in mhd_list}
 
     print(presentOnDisk_set)
 
@@ -28,15 +30,15 @@ def getCandidateInfoList(requireOnDisk_bool=True):
     with open('/kaggle/input/luna16/annotations.csv', 'r') as f:
         for row in list(csv.reader(f))[1:]:
             series_uid = row[0]
-            annotationCenter_xyz = tuple( [float(x) for x in row[1:4] ] )
+            annotationCenter_xyz = tuple([float(x) for x in row[1:4]])
             annotationDiameter_mm = float(row[4])
 
             diameter_dict.setdefault(series_uid, []).append(
                 (annotationCenter_xyz, annotationDiameter_mm)
             )
 
+    candidateInfo_list = []
 
-    candidateInfo_list =  []
 
     with open('/kaggle/input/luna16/candidates.csv', 'r') as f:
         for row in list(csv.reader(f))[1:]:
@@ -51,30 +53,32 @@ def getCandidateInfoList(requireOnDisk_bool=True):
             candidateDiameter_mm = 0.0
             for annotation_tuple in diameter_dict.get(series_uid, []):
                 annotationCenter_xyz, annotationDiameter_mm = annotation_tuple
-                
-                for i in range(3):
-                    delta_mm = abs( annotationCenter_xyz[i] - candidateCenter_xyz[i] )
 
-                    if delta_mm > annotationDiameter_mm / 4 :
+                for i in range(3):
+                    delta_mm = abs(
+                        annotationCenter_xyz[i] - candidateCenter_xyz[i])
+
+                    if delta_mm > annotationDiameter_mm / 4:
                         break
                     else:
                         candidateDiameter_mm = annotationDiameter_mm
                         break
 
-            candidateInfo_list.append( CandidateInfoTuple(
+            candidateInfo_list.append(CandidateInfoTuple(
                 isNodule_bool,
                 candidateDiameter_mm,
                 series_uid,
                 candidateCenter_xyz
-            ) )
+            ))
 
-        candidateInfo_list.sort( reverse=True )
+        candidateInfo_list.sort(reverse=True)
 
         # print(candidateInfo_list[-1][2])
 
         return candidateInfo_list
 
 # getCandidateInfoList()
+
 
 class Ct:
     def __init__(self, series_uid):
@@ -97,7 +101,7 @@ class Ct:
         self.vxSize_xyz = XyzTuple(*ct_mhd.GetSpacing())
         self.direction_a = np.array(ct_mhd.GetDirection()).reshape(3, 3)
 
-     def getRawCandidate(self, center_xyz, width_irc):
+    def getRawCandidate(self, center_xyz, width_irc):
         center_irc = xyz2irc(
             center_xyz,
             self.origin_xyz,
@@ -130,4 +134,71 @@ class Ct:
 
         return ct_chunk, center_irc
 
-ct = Ct('1.3.6.1.4.1.14519.5.2.1.6279.6001.250863365157630276148828903732')
+
+@functools.lru_cache(1, typed=True)
+def getCt(series_uid):
+    return Ct(series_uid)
+
+@raw_cache.memoize(typed=True)
+def getCtRawCandidate(series_uid, center_xyz, width_irc):
+    ct = getCt(series_uid)
+    ct_chunk, center_irc = ct.getRawCandidate(center_xyz, width_irc)
+    return ct_chunk, center_irc
+
+class LunaDataset(Dataset):
+    def __init__(self,
+                 val_stride=0,
+                 isValSet_bool=None,
+                 series_uid=None,
+            ):
+        self.candidateInfo_list = copy.copy(getCandidateInfoList())
+
+        if series_uid:
+            self.candidateInfo_list = [
+                x for x in self.candidateInfo_list if x.series_uid == series_uid
+            ]
+
+        if isValSet_bool:
+            assert val_stride > 0, val_stride
+            self.candidateInfo_list = self.candidateInfo_list[::val_stride]
+            assert self.candidateInfo_list
+        elif val_stride > 0:
+            del self.candidateInfo_list[::val_stride]
+            assert self.candidateInfo_list
+
+        # log.info("{!r}: {} {} samples".format(
+        #     self,
+        #     len(self.candidateInfo_list),
+        #     "validation" if isValSet_bool else "training",
+        # ))
+
+    def __len__(self):
+        return len(self.candidateInfo_list)
+
+    def __getitem__(self, ndx):
+        candidateInfo_tup = self.candidateInfo_list[ndx]
+        width_irc = (32, 48, 48)
+
+        candidate_a, center_irc = getCtRawCandidate(
+            candidateInfo_tup.series_uid,
+            candidateInfo_tup.center_xyz,
+            width_irc,
+        )
+
+        candidate_t = torch.from_numpy(candidate_a)
+        candidate_t = candidate_t.to(torch.float32)
+        candidate_t = candidate_t.unsqueeze(0)
+
+        pos_t = torch.tensor([
+                not candidateInfo_tup.isNodule_bool,
+                candidateInfo_tup.isNodule_bool
+            ],
+            dtype=torch.long,
+        )
+
+        return (
+            candidate_t,
+            pos_t,
+            candidateInfo_tup.series_uid,
+            torch.tensor(center_irc),
+        )

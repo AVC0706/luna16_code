@@ -37,7 +37,7 @@ def getCandidateInfoList(requireOnDisk_bool=True):
     # We construct a set with all series_uids that are present on disk.
     # This will let us use the data, even if we haven't downloaded all of
     # the subsets yet.
-    mhd_list = glob.glob(dsetLocation+'/subset0/subset0/*.mhd')
+    mhd_list = glob.glob(dsetLocation+'/subset*/subset*/*.mhd')
     presentOnDisk_set = {os.path.split(p)[-1][:-4] for p in mhd_list}
 
     diameter_dict = {}
@@ -86,7 +86,7 @@ def getCandidateInfoList(requireOnDisk_bool=True):
 class Ct:
     def __init__(self, series_uid):
         mhd_path = glob.glob(
-            dsetLocation+'/subset0/subset0/{}.mhd'.format(series_uid)
+            dsetLocation+'/subset*/subset*/{}.mhd'.format(series_uid)
         )[0]
 
         ct_mhd = sitk.ReadImage(mhd_path)

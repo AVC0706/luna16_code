@@ -32,7 +32,7 @@ CandidateInfoTuple = namedtuple(
 
 dsetLocation = "/kaggle/input/luna16"
 
-@functools.lru_cache(1)
+# @functools.lru_cache(1)
 def getCandidateInfoList(requireOnDisk_bool=True):
     # We construct a set with all series_uids that are present on disk.
     # This will let us use the data, even if we haven't downloaded all of
@@ -139,11 +139,11 @@ class Ct:
         return ct_chunk, center_irc
 
 
-@functools.lru_cache(1, typed=True)
+# @functools.lru_cache(1, typed=True)
 def getCt(series_uid):
     return Ct(series_uid)
 
-@raw_cache.memoize(typed=True)
+# @raw_cache.memoize(typed=True)
 def getCtRawCandidate(series_uid, center_xyz, width_irc):
     ct = getCt(series_uid)
     ct_chunk, center_irc = ct.getRawCandidate(center_xyz, width_irc)

@@ -192,7 +192,6 @@ class LunaDataset(Dataset):
         return len(self.candidateInfo_list)
 
     def __getitem__(self, ndx):
-        print('---------get item --------')
         candidateInfo_tup = self.candidateInfo_list[ndx]
         width_irc = (32, 48, 48)
 

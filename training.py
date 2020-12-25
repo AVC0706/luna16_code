@@ -190,7 +190,7 @@ class LunaTrainingApp:
             loss_var.backward()
             self.optimizer.step()
             
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
 
             # # This is for adding the model graph to TensorBoard.
             # if epoch_ndx == 1 and batch_ndx == 0:

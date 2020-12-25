@@ -36,12 +36,12 @@ class LunaTrainingApp:
         parser = argparse.ArgumentParser()
         parser.add_argument('--num-workers',
             help='Number of worker processes for background data loading',
-            default=8,
+            default=2,
             type=int,
         )
         parser.add_argument('--batch-size',
             help='Batch size to use for training',
-            default=32,
+            default=16,
             type=int,
         )
         parser.add_argument('--epochs',
@@ -157,7 +157,7 @@ class LunaTrainingApp:
 
             valMetrics_t = self.doValidation(epoch_ndx, val_dl)
             self.logMetrics(epoch_ndx, 'val', valMetrics_t)
-
+            
         if hasattr(self, 'trn_writer'):
             self.trn_writer.close()
             self.val_writer.close()
@@ -177,6 +177,7 @@ class LunaTrainingApp:
             start_ndx=train_dl.num_workers,
         )
         for batch_ndx, batch_tup in batch_iter:
+
             self.optimizer.zero_grad()
 
             loss_var = self.computeBatchLoss(
@@ -188,6 +189,8 @@ class LunaTrainingApp:
 
             loss_var.backward()
             self.optimizer.step()
+            
+            torch.cuda.empty_cache()
 
             # # This is for adding the model graph to TensorBoard.
             # if epoch_ndx == 1 and batch_ndx == 0:

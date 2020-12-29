@@ -32,12 +32,12 @@ CandidateInfoTuple = namedtuple(
 
 dsetLocation = "/kaggle/input/luna16"
 
-# @functools.lru_cache(1)
+@functools.lru_cache(1)
 def getCandidateInfoList(requireOnDisk_bool=True):
     # We construct a set with all series_uids that are present on disk.
     # This will let us use the data, even if we haven't downloaded all of
     # the subsets yet.
-    mhd_list = glob.glob(dsetLocation+'/subset*/subset*/*.mhd')
+    mhd_list = glob.glob(dsetLocation+'/subset0/subset0/*.mhd')
     presentOnDisk_set = {os.path.split(p)[-1][:-4] for p in mhd_list}
 
     diameter_dict = {}
@@ -86,7 +86,7 @@ def getCandidateInfoList(requireOnDisk_bool=True):
 class Ct:
     def __init__(self, series_uid):
         mhd_path = glob.glob(
-            dsetLocation+'/subset*/subset*/{}.mhd'.format(series_uid)
+            dsetLocation+'/subset0/subset0/{}.mhd'.format(series_uid)
         )[0]
 
         ct_mhd = sitk.ReadImage(mhd_path)
@@ -139,11 +139,11 @@ class Ct:
         return ct_chunk, center_irc
 
 
-# @functools.lru_cache(1, typed=True)
+@functools.lru_cache(1, typed=True)
 def getCt(series_uid):
     return Ct(series_uid)
 
-# @raw_cache.memoize(typed=True)
+@raw_cache.memoize(typed=True)
 def getCtRawCandidate(series_uid, center_xyz, width_irc):
     ct = getCt(series_uid)
     ct_chunk, center_irc = ct.getRawCandidate(center_xyz, width_irc)
